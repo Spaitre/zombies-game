@@ -1,0 +1,22 @@
+{
+  "name": "zombies-game",
+  "version": "0.2.0",
+  "description": "Top-down 3D survival shooter inspirado en Call of Mini Zombies 2 (Three.js)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "three": "^0.169.0",
+    "ws": "^8.21.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>Zombies Survival 3D — Fase 4</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 100%; height: 100%; overflow: hidden; background: #0c0c10; font-family: system-ui, sans-serif; }
+      #game { position: fixed; inset: 0; }
+      canvas { display: block; }
+
+      /* --- HUD --- */
+      #hud { position: fixed; inset: 0; pointer-events: none; color: #fff; user-select: none; }
+      #hud .stat { position: absolute; font-size: 20px; text-shadow: 0 2px 4px rgba(0,0,0,.8); }
+      #hp-text { top: 14px; left: 16px; }
+      #score-text { top: 42px; left: 16px; }
+      #coins-text { top: 70px; left: 16px; color: #ffd54f; }
+      #wave-text { top: 14px; right: 16px; }
+      #weapon-text { top: 42px; right: 16px; color: #ffd54f; font-weight: 700; }
+      #hpbar-bg { position: absolute; top: 104px; left: 16px; width: 240px; height: 18px;
+        background: rgba(0,0,0,.5); border-radius: 4px; }
+      #hpbar { position: absolute; top: 106px; left: 18px; width: 236px; height: 14px;
+        background: #e53935; border-radius: 3px; transition: width .12s linear; }
+      #announce { position: absolute; top: 34%; left: 0; right: 0; text-align: center;
+        font-size: 52px; font-weight: 800; color: #ffd54f; text-shadow: 0 3px 8px rgba(0,0,0,.9);
+        opacity: 0; transition: opacity .4s; }
+
+      /* --- Barra de jefe --- */
+      #boss-bar { position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
+        width: 420px; max-width: 70vw; display: none; }
+      #boss-bar .label { text-align: center; color: #ce93d8; font-weight: 800; font-size: 18px;
+        text-shadow: 0 2px 4px rgba(0,0,0,.9); margin-bottom: 4px; letter-spacing: 1px; }
+      #boss-bar-bg { width: 100%; height: 16px; background: rgba(0,0,0,.6); border-radius: 4px;
+        border: 2px solid #8e24aa; }
+      #boss-bar-fill { height: 100%; width: 100%; background: linear-gradient(90deg,#ab47bc,#e040fb);
+        border-radius: 3px; transition: width .1s linear; }
+
+      /* --- Overlays (menú, tienda, game over) --- */
+      .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center;
+        justify-content: center; gap: 16px; background: rgba(10,10,16,.82); color: #fff; text-align: center; }
+      .overlay.show { display: flex; }
+      .overlay h1 { font-size: 60px; }
+      .overlay .big { font-size: 26px; }
+      .btn { pointer-events: auto; cursor: pointer; border: none; font: 800 24px system-ui;
+        color: #15151c; background: #4fc3f7; padding: 14px 30px; border-radius: 8px; }
+      .btn:hover { background: #81d4fa; }
+      .btn.green { background: #66bb6a; } .btn.green:hover { background: #81c784; }
+      .btn.red { background: #ef5350; color: #fff; } .btn.red:hover { background: #e57373; }
+
+      #menu h1 { color: #e040fb; text-shadow: 0 4px 16px rgba(224,64,251,.4); }
+      #menu .sub { color: #b0bec5; font-size: 18px; max-width: 520px; line-height: 1.5; }
+
+      #gameover h1 { color: #e53935; }
+      #gameover .rec { font-size: 22px; color: #9e9e9e; }
+      #gameover .rec.new { color: #ffd54f; }
+
+      /* --- Menú de mejoras --- */
+      #shop h1 { color: #ffd54f; font-size: 38px; }
+      #shop .coins { font-size: 20px; color: #ffd54f; }
+      #shop .grid { display: flex; flex-direction: column; gap: 10px; width: 660px; max-width: 94vw;
+        max-height: 60vh; overflow-y: auto; padding: 4px 8px; }
+      .up-section { border: 1px solid #263340; border-radius: 10px; padding: 8px 10px; background: rgba(0,0,0,.25); }
+      .up-section h3 { font-size: 15px; color: #90caf9; margin-bottom: 6px; letter-spacing: .5px; text-align: left; }
+      .up-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+      .shop-item { pointer-events: auto; cursor: pointer; text-align: left; border: 2px solid #37474f;
+        background: #1e2530; color: #fff; border-radius: 8px; padding: 8px 10px; font: 600 14px system-ui; }
+      .shop-item:hover:not(:disabled) { border-color: #4fc3f7; background: #243044; }
+      .shop-item:disabled { opacity: .45; cursor: not-allowed; }
+      .shop-item .name { font-weight: 800; font-size: 14px; }
+      .shop-item .meta { font-size: 12px; color: #b0bec5; margin-top: 3px; }
+      .shop-item .cost { color: #ffd54f; }
+
+      #hint { position: fixed; bottom: 12px; left: 0; right: 0; text-align: center;
+        color: #8a8a9a; font-size: 14px; pointer-events: none; }
+
+      /* --- Aviso para capturar el cursor (pointer lock) --- */
+      #lockhint { display: none; position: fixed; left: 50%; top: 60%; transform: translateX(-50%);
+        z-index: 9; pointer-events: none; color: #fff; background: rgba(10,10,16,.7);
+        padding: 12px 22px; border-radius: 10px; font: 700 19px system-ui;
+        border: 1px solid rgba(255,255,255,.25); text-shadow: 0 2px 4px rgba(0,0,0,.8); }
+
+      /* --- Mira fija (centro de pantalla) --- */
+      #crosshair { display: none; position: fixed; left: 50%; top: 50%; width: 26px; height: 26px;
+        transform: translate(-50%, -50%); pointer-events: none; z-index: 8; }
+      #crosshair::before, #crosshair::after { content: ''; position: absolute; background: rgba(255,255,255,.85);
+        box-shadow: 0 0 2px rgba(0,0,0,.9); }
+      #crosshair::before { left: 50%; top: 0; width: 2px; height: 100%; transform: translateX(-50%); }
+      #crosshair::after { top: 50%; left: 0; height: 2px; width: 100%; transform: translateY(-50%); }
+      #crosshair .dot { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; border-radius: 50%;
+        background: #ff5252; transform: translate(-50%, -50%); box-shadow: 0 0 3px rgba(0,0,0,.9); }
+
+      /* --- Pulido: daño, viñeta, silencio --- */
+      #damage-flash { position: fixed; inset: 0; background: #ff1744; opacity: 0;
+        pointer-events: none; transition: opacity .25s; z-index: 5; }
+      #vignette { position: fixed; inset: 0; pointer-events: none; opacity: 0; z-index: 4;
+        box-shadow: inset 0 0 180px 70px rgba(229,57,53,.75); }
+      #vignette.show { animation: pulse 1.1s ease-in-out infinite; }
+      @keyframes pulse { 0%,100% { opacity: .5; } 50% { opacity: 1; } }
+      #mute-btn { position: fixed; bottom: 34px; right: 14px; z-index: 10; pointer-events: auto;
+        cursor: pointer; border: none; background: rgba(0,0,0,.4); color: #fff; font-size: 22px;
+        width: 44px; height: 44px; border-radius: 50%; }
+
+      /* --- Controles táctiles --- */
+      #touch-ui { display: none; position: fixed; inset: 0; z-index: 6; pointer-events: none; }
+      .joystick { position: absolute; bottom: 32px; width: 132px; height: 132px; border-radius: 50%;
+        background: rgba(255,255,255,.06); border: 2px solid rgba(255,255,255,.18);
+        pointer-events: auto; touch-action: none; }
+      #joy-move { left: 24px; }
+      #joy-aim { right: 24px; border-color: rgba(255,82,82,.45); }
+      .joystick .knob { position: absolute; top: 50%; left: 50%; width: 58px; height: 58px;
+        margin: -29px 0 0 -29px; border-radius: 50%; background: rgba(255,255,255,.28); }
+      #jump-btn { display: none; position: fixed; left: 50%; transform: translateX(-50%); bottom: 44px;
+        z-index: 7; pointer-events: auto; touch-action: none; width: 78px; height: 78px; border-radius: 50%;
+        border: 2px solid rgba(129,212,250,.5); background: rgba(79,195,247,.18); color: #e1f5fe; font-size: 30px; }
+
+      .overlay { z-index: 20; }
+    </style>
+  </head>
+  <body>
+    <div id="game"></div>
+
+    <div id="hud">
+      <div id="hp-text" class="stat">Vida: 100</div>
+      <div id="score-text" class="stat">Puntos: 0</div>
+      <div id="coins-text" class="stat">Monedas: 0</div>
+      <div id="wave-text" class="stat">Día: 1</div>
+      <div id="weapon-text" class="stat">Pistola</div>
+      <div id="hpbar-bg"></div>
+      <div id="hpbar"></div>
+      <div id="announce"></div>
+
+      <div id="boss-bar">
+        <div class="label">JEFE</div>
+        <div id="boss-bar-bg"><div id="boss-bar-fill"></div></div>
+      </div>
+    </div>
+
+    <!-- Pantalla de carga -->
+    <div id="loading" class="overlay show">
+      <h1 style="color:#4fc3f7">Cargando…</h1>
+      <div class="sub" style="color:#b0bec5">Preparando el vecindario 🧟</div>
+    </div>
+
+    <!-- Menú de inicio -->
+    <div id="menu" class="overlay">
+      <h1>ZOMBIES 3D</h1>
+      <div class="sub">Modo campaña por días: sobrevive cada día (nivel) y vuelve al menú para
+        mejorar tus armas y personaje con las monedas ganadas. Cada día es un poco más difícil.</div>
+      <button id="play-btn" class="btn">JUGAR MODO NIVELES</button>
+      <button id="boss-btn" class="btn red">MODO JEFE</button>
+      <button id="upgrade-btn" class="btn green">MEJORAR ARMAS</button>
+    </div>
+
+    <!-- Modo jefe: selección de dificultad -->
+    <div id="bossmenu" class="overlay">
+      <h1 style="color:#e53935">MODO JEFE</h1>
+      <div class="sub">Un solo nivel contra hordas y jefes. Elige la dificultad
+        (los enemigos usan los parámetros de ese nivel de campaña).</div>
+      <button class="btn boss-diff" data-diff="easy">FÁCIL · nivel 50</button>
+      <button class="btn boss-diff" data-diff="normal">NORMAL · nivel 100</button>
+      <button class="btn red boss-diff" data-diff="hard">DIFÍCIL · nivel 150</button>
+      <button class="btn red boss-diff" data-diff="insane">INSANO · nivel 200</button>
+      <button id="bossmenu-back" class="btn">◀ VOLVER</button>
+    </div>
+
+    <!-- Menú de mejoras (entre niveles / desde el menú) -->
+    <div id="shop" class="overlay">
+      <h1>MEJORAS</h1>
+      <div class="coins">Día <span id="shop-day">0</span> · Monedas: <span id="shop-coins">0</span></div>
+      <div id="shop-grid" class="grid"></div>
+      <button id="next-btn" class="btn green">SIGUIENTE DÍA ▶</button>
+      <button id="back-btn" class="btn">◀ VOLVER</button>
+    </div>
+
+    <!-- Pausa -->
+    <div id="pause" class="overlay">
+      <h1 style="color:#4fc3f7">PAUSA</h1>
+      <div class="sub" style="color:#b0bec5">El juego está en pausa</div>
+      <button id="resume-btn" class="btn">REANUDAR</button>
+      <button id="pause-menu-btn" class="btn red">SALIR AL MENÚ</button>
+    </div>
+
+    <!-- Game Over -->
+    <div id="gameover" class="overlay">
+      <h1>GAME OVER</h1>
+      <div id="go-wave" class="big"></div>
+      <div id="go-score" class="big"></div>
+      <div id="go-record" class="rec"></div>
+      <button id="restart-btn" class="btn">JUGAR DE NUEVO</button>
+    </div>
+
+    <!-- Mira fija + aviso de captura de cursor -->
+    <div id="crosshair"><div class="dot"></div></div>
+    <div id="lockhint">🖱️ Haz clic para capturar el cursor</div>
+
+    <div id="hint">WASD: moverse · Mouse: girar cámara · Click der.: apuntar · Click izq.: disparar · R: recargar · Espacio: saltar</div>
+
+    <!-- Pulido -->
+    <div id="damage-flash"></div>
+    <div id="vignette"></div>
+    <button id="mute-btn">🔊</button>
+
+    <!-- Controles táctiles (móvil) -->
+    <div id="touch-ui">
+      <div id="joy-move" class="joystick"><div class="knob"></div></div>
+      <div id="joy-aim" class="joystick"><div class="knob"></div></div>
+      <button id="jump-btn">⤒</button>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

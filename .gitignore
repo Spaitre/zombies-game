@@ -1,0 +1,10 @@
+# Dependencias (se reinstalan con `npm install`)
+node_modules/
+
+# Build de Vite
+dist/
+
+# Logs y temporales
+*.log
+npm-debug.log*
+.DS_Store
