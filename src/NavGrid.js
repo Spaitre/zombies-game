@@ -65,24 +65,42 @@ export default class NavGrid {
 
   /** Recalcula el campo si el jugador cambió de celda o de nivel. */
   computeFlowField(target, targetLevel = 0) {
-    let tc = Math.max(0, Math.min(this.cols - 1, this.toCol(target.x)));
-    let tr = Math.max(0, Math.min(this.rows - 1, this.toRow(target.z)));
-    const layer = targetLevel ? 1 : 0;
-    let tcell = this.idx(tc, tr);
-    if (!this.walkAt(layer, tcell)) {
-      const nn = this.nearestWalkable(tc, tr, layer);
-      if (nn < 0) return;
-      tcell = nn;
+    this.computeFlowFieldMulti([{ x: target.x, z: target.z, level: targetLevel }]);
+  }
+
+  /**
+   * Flow field MULTI-FUENTE (co-op): BFS sembrada con las celdas de todos los
+   * objetivos a la vez → cada zombie fluye hacia el jugador vivo más CERCANO
+   * (por distancia de camino), al mismo coste que con un solo objetivo.
+   * `targets` = [{ x, z, level }].
+   */
+  computeFlowFieldMulti(targets) {
+    const nodes = [];
+    for (const t of targets) {
+      const tc = Math.max(0, Math.min(this.cols - 1, this.toCol(t.x)));
+      const tr = Math.max(0, Math.min(this.rows - 1, this.toRow(t.z)));
+      const layer = t.level ? 1 : 0;
+      let tcell = this.idx(tc, tr);
+      if (!this.walkAt(layer, tcell)) {
+        const nn = this.nearestWalkable(tc, tr, layer);
+        if (nn < 0) continue;
+        tcell = nn;
+      }
+      nodes.push(layer * this.N + tcell);
     }
-    const tnode = layer * this.N + tcell;
-    if (tnode === this.lastTargetNode) return;
-    this.lastTargetNode = tnode;
+    if (!nodes.length) return;
+    nodes.sort((a, b) => a - b);
+    const key = nodes.join(',');
+    if (key === this.lastTargetNode) return; // sin cambios de celda/nivel: cachea
+    this.lastTargetNode = key;
 
     const dist = this._dist;
     dist.fill(-1);
     this.next.fill(-1);
-    dist[tnode] = 0;
-    const queue = [tnode];
+    const queue = [];
+    for (const n of nodes) {
+      if (dist[n] < 0) { dist[n] = 0; queue.push(n); }
+    }
     const D = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 
     let head = 0;

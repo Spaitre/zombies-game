@@ -145,6 +145,15 @@ export default class Player {
 
   /** Recoge la entrada, avanza la simulación y sincroniza el render. */
   move(delta) {
+    // Derribado (co-op): tumbado en el suelo, sin moverse ni animar.
+    if (this.sim.downed) {
+      const p = this.sim.position;
+      this.mesh.position.set(p.x, p.y, p.z);
+      this.model.rotation.x = -Math.PI / 2;
+      return;
+    }
+    if (this.model.rotation.x !== 0) this.model.rotation.x = 0; // reanimado: en pie
+
     const aiming = this.game.input.aimDown || !!this.game.input.touchAim;
 
     // Dirección de movimiento en mundo (relativa a la cámara).

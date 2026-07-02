@@ -20,6 +20,8 @@ export default {
     this.hud.hideBossMenu();
     this.hud.hideGameOver();
     this.hud.hideShop();
+    this.hud.hideLobby();
+    this.setupNetPlayers(); // co-op: instancia a los compañeros de sala (si hay)
 
     this.bossCfg = cfg;
     this.wave = cfg.level;              // nivel en el que se basan los enemigos

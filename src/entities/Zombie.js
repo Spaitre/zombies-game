@@ -106,6 +106,36 @@ export default class Zombie {
     }
   }
 
+  // --- Modo títere (co-op): el servidor simula; aquí solo se interpola ---------
+
+  /** Último estado recibido del servidor (posición, orientación, vida). */
+  setNetTarget(s) {
+    if (!this._net) this._net = { x: s.x, y: s.y, z: s.z, f: s.f || 0 };
+    else { this._net.x = s.x; this._net.y = s.y; this._net.z = s.z; this._net.f = s.f || 0; }
+    this.sim.hp = s.hp;
+    this.sim.maxHp = s.mhp;
+    this.sim.emerging = !!s.em;
+  }
+
+  /** Interpola hacia el estado del servidor y anima (sin lógica local). */
+  updatePuppet(delta) {
+    if (!this._net || !this.sim.alive) return;
+    const p = this.sim.position;
+    const k = Math.min(1, delta * 10);
+    p.x += (this._net.x - p.x) * k;
+    p.y += (this._net.y - p.y) * k;
+    p.z += (this._net.z - p.z) * k;
+    let d = this._net.f - this.sim.facing;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    this.sim.facing += d * k;
+    this.mesh.position.set(p.x, p.y, p.z);
+    this.mesh.rotation.y = this.sim.facing;
+    if (this.mixer) {
+      this.mixer.update(delta);
+      this.model.position.y = this.sim.baseY;
+    }
+  }
+
   hurt(amount) {
     const dead = this.sim.hurt(amount);
     for (const m of this.mats) m.emissive = new THREE.Color(0xff4444);

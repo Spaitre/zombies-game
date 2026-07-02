@@ -59,6 +59,10 @@ bucle, cámara, oleadas, tienda, colisiones, hitscan, etc. viven aquí).
 | `src/systems/camera.js` | Cámara RE2: `crosshairTarget`, `updateAimUI`, `addRecoil`, `updateLook`, `updateCamYaw`, `computeDesiredCamera`, `computeLookTarget`, `snapCamera`, `updateCamera`. |
 | `src/systems/platforms.js` | Verticalidad: `registerPlatform`/`registerRoof`, `updateRoofFade`, `platformTop`, `supportHeight`. |
 | `src/systems/bossmode.js` | Modo jefe (nivel único por dificultad): `startBossMode`, `updateBossLevel`, spawns (mezcla 55/30/15, máx 12, cada 2 s), jefes por tiempo con 2× vida, `bossLevelVictory`. |
+| `src/systems/netclient.js` | Cliente de salas co-op (mixin): `createRoom`/`joinRoom`/`leaveRoom`, lobby, `setupNetPlayers`, `netTick` (envía estado propio ~12/s), `netCleanup`. |
+| `src/Net.js` | WebSocket del cliente: conexión (mismo origen en prod; `ws://localhost:4173` en dev), protocolo de salas (`create/join/start/state/leave`) y callbacks. |
+| `src/entities/RemotePlayer.js` | Compañero de sala: modelo keeper tintado, interpola posición/orientación desde la red (solo visual). |
+| `server.js` | Producción/Railway: sirve `dist/` + servidor de salas WebSocket (crear/unirse por código de 4 letras, máx 4, relé de estados, herencia de anfitrión al desconectar). |
 | `src/entities/Player.js` | Jugador: movimiento, verticalidad/salto, `aim()` (RE2), `updateFacing` (root rotation), `applyAimPose` (aim offset procedural), animaciones, `fire()` (todas las armas), bloom/recoil del rifle, munición/recarga. |
 | `src/entities/Zombie.js` | Enemigos: tipos (walker/runner/tank/boss), navegación (flow field), verticalidad, aparición "desenterrándose", muerte (clip `die` + cadáver 5 s), animación de correr. |
 | `src/entities/Bullet.js` / `EnemyBullet.js` | Proyectiles físicos (pistola, granada, escupitajo del jefe). 3D. |
@@ -122,10 +126,28 @@ bucle, cámara, oleadas, tienda, colisiones, hitscan, etc. viven aquí).
   headless (walls/nav/supportHeight/clampToWorld) + spawns de gameplay. Un servidor
   usaría un `fx` no-op (o difusor de eventos por la red). `explode`/`hitscanFire`/
   `killZombie`/`waves`/`onPlayerHurt`/`gameOver` ya enrutan sus FX por `fx`.
-- **Pendiente (netcode):** servidor autoritario + salas/lobby + sincronización de
-  estado; y que los spawns (`spawnBullet`/`spawnEnemyBullet`) creen entidades solo-sim
-  en el servidor (hoy crean también la vista/mesh) — el patrón estado+vista ya lo
-  permite. `game.fx` sería el punto donde el servidor difunde eventos a los clientes.
+- **Hecho (Fase 2a, mundo headless):** la simulación completa corre en Node sin
+  navegador (suite: `npm run test:sim`).
+  - **`src/sim/mapLayout.js`**: cajas de colisión + plataformas del mapa con
+    matemática pura. ⚠️ Duplicación controlada con `Map.js` (las torres usan huella
+    medida del modelo); verificado **idéntico caja a caja** (174 cajas, 20
+    plataformas) contra el mundo vivo del cliente. Si cambias el layout en uno,
+    cambia el otro.
+  - **`src/sim/HeadlessWorld.js`**: el "Game sin render" — mapa + `Walls`/`NavGrid`,
+    jugadores por **inputs** (`setInput`: moveDir/aiming/jump/fire/aimPoint),
+    hitscan **matemático** (rayo vs AABB por slabs + zombies como cilindros; sin
+    `THREE.Raycaster`), granadas/escupitajos, colisiones, línea temporal del modo
+    jefe, y `fx` → **cola de eventos** (`this.events`) para difundir por red.
+  - **`NavGrid.computeFlowFieldMulti(targets)`**: BFS multi-fuente — cada zombie
+    persigue al jugador vivo más cercano al mismo coste; `computeFlowField` delega
+    (campaña 1J intacta).
+  - **Derribo/reanimación co-op** (`PlayerSim` + `HeadlessWorld`): a 0 de vida el
+    jugador queda DERRIBADO (tirado, sin moverse/disparar, los zombies lo ignoran);
+    un aliado parado encima `REVIVE_TIME` (10 s) lo levanta con `REVIVE_HP_FRACT`
+    (50 %); si todos caen → game over. Constantes en `shared.js`.
+- **Pendiente (Fase 2b/2c):** servidor corre `HeadlessWorld` por sala + protocolo
+  snapshot/eventos + zombies "títere" en el cliente + predicción local + visual de
+  derribo/reanimación en cliente. Se prueba de verdad tras desplegar en Railway.
 - **Gotcha (patrón estado+vista):** al mover estado a la sim, **reexpón en la vista
   TODOS los campos que el resto del código lee** (getters que reenvían a `this.sim`).
   Si falta uno, se lee `undefined` → p. ej. faltó `Zombie.damage` y el jugador recibía
@@ -242,6 +264,24 @@ bucle, cámara, oleadas, tienda, colisiones, hitscan, etc. viven aquí).
   fuera de la rejilla van directos al jugador). `buildBounds(size)` (re)construye.
 - **Loadout:** usa las **mejoras de campaña** persistidas (ver abajo). **Victoria**
   al matar todo → "¡NIVEL COMPLETADO!" → menú. Morir → game over → menú.
+
+### Salas co-op del modo jefe (Fase 1: lobby + presencia)
+- **Flujo:** menú modo jefe → `CREAR SALA` (código de 4 letras) o `UNIRSE` con código →
+  lobby con lista de jugadores (máx 4, 👑 = anfitrión) → el anfitrión elige dificultad
+  y **todos arrancan a la vez**. Salir/morir/ganar → se abandona la sala.
+- **Qué sincroniza la Fase 1:** solo **presencia** — cada cliente ve a sus compañeros
+  (`RemotePlayer`) moverse en el arena (~12 estados/s, interpolados). **Los enemigos
+  NO se comparten aún**: cada cliente simula sus propias hordas. La autoridad del
+  servidor sobre enemigos/daño es la **Fase 2** (la separación sim/render ya la permite).
+- **Dev local:** el multijugador necesita `node server.js` corriendo APARTE de
+  `npm run dev` (el cliente en 5173 se conecta a `ws://localhost:4173`). En
+  producción usa el mismo origen (wss automático en HTTPS).
+
+### Despliegue (Railway)
+- `npm run build` → `dist/` (verificado: index + assets + 410 .glb). `npm start` →
+  `server.js` sirve `dist/` y el WebSocket de salas en `process.env.PORT`.
+- En Railway: Deploy from GitHub repo; si `zombies-game` es subcarpeta, poner
+  **Root Directory** = `zombies-game`. Railway corre install → build → start.
 
 ### Persistencia del loadout (localStorage)
 - `Game.saveProgress/loadProgress/applyProgress` guardan **armas desbloqueadas +

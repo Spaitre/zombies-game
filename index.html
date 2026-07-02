@@ -48,6 +48,18 @@
       .btn.green { background: #66bb6a; } .btn.green:hover { background: #81c784; }
       .btn.red { background: #ef5350; color: #fff; } .btn.red:hover { background: #e57373; }
 
+      /* --- Salas co-op (modo jefe) --- */
+      .room-row { display: flex; gap: 10px; align-items: center; justify-content: center; }
+      #room-code { pointer-events: auto; width: 120px; text-align: center; font: 800 22px system-ui;
+        letter-spacing: 4px; text-transform: uppercase; color: #fff; background: #1e2530;
+        border: 2px solid #37474f; border-radius: 8px; padding: 12px 8px; outline: none; }
+      #room-code:focus { border-color: #4fc3f7; }
+      .room-error { min-height: 22px; color: #ef9a9a; font-size: 15px; }
+      .lobby-players { display: flex; flex-direction: column; gap: 6px; min-width: 260px; }
+      .lobby-players .p { background: #1e2530; border: 2px solid #37474f; border-radius: 8px;
+        padding: 8px 14px; font: 700 17px system-ui; }
+      .lobby-players .p.host { border-color: #66bb6a; }
+
       #menu h1 { color: #e040fb; text-shadow: 0 4px 16px rgba(224,64,251,.4); }
       #menu .sub { color: #b0bec5; font-size: 18px; max-width: 520px; line-height: 1.5; }
 
@@ -161,7 +173,32 @@
       <button class="btn boss-diff" data-diff="normal">NORMAL · nivel 100</button>
       <button class="btn red boss-diff" data-diff="hard">DIFÍCIL · nivel 150</button>
       <button class="btn red boss-diff" data-diff="insane">INSANO · nivel 200</button>
+      <div class="sub" style="margin-top:6px">— Con amigos (co-op, máx 4) —</div>
+      <div class="room-row">
+        <button id="room-create-btn" class="btn green">CREAR SALA</button>
+        <input id="room-code" maxlength="4" placeholder="CÓDIGO" autocomplete="off" />
+        <button id="room-join-btn" class="btn">UNIRSE</button>
+      </div>
+      <div id="room-error" class="room-error"></div>
       <button id="bossmenu-back" class="btn">◀ VOLVER</button>
+    </div>
+
+    <!-- Lobby de sala (modo jefe co-op) -->
+    <div id="lobby" class="overlay">
+      <h1 style="color:#66bb6a">SALA <span id="lobby-code">----</span></h1>
+      <div class="sub">Comparte el código con tus amigos para que se unan (máx 4).</div>
+      <div id="lobby-players" class="lobby-players"></div>
+      <div id="lobby-host" style="display:none">
+        <div class="sub">Eres el anfitrión: elige la dificultad para empezar.</div>
+        <div class="room-row">
+          <button class="btn lobby-diff" data-diff="easy">FÁCIL</button>
+          <button class="btn lobby-diff" data-diff="normal">NORMAL</button>
+          <button class="btn red lobby-diff" data-diff="hard">DIFÍCIL</button>
+          <button class="btn red lobby-diff" data-diff="insane">INSANO</button>
+        </div>
+      </div>
+      <div id="lobby-wait" class="sub" style="display:none">Esperando a que el anfitrión empiece…</div>
+      <button id="lobby-leave" class="btn">◀ SALIR DE LA SALA</button>
     </div>
 
     <!-- Menú de mejoras (entre niveles / desde el menú) -->

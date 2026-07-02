@@ -72,6 +72,14 @@ export const BOSS_MODE_WORLD_MULT = 3;   // el mapa es el triple de grande
 // Mezcla de enemigos normales (acumulativa): zombie 55%, esqueleto 30%, fantasma 15%.
 export const BOSS_MODE_MIX = [['walker', 0.55], ['runner', 0.85], ['tank', 1.0]];
 
+// --- Co-op: derribo y reanimación -----------------------------------------
+// Al llegar a 0 de vida en co-op el jugador queda DERRIBADO (no muerto): un
+// aliado debe pararse encima de él REVIVE_TIME segundos para reanimarlo. Si
+// todos están derribados → game over.
+export const REVIVE_TIME = 10;      // segundos parado encima para reanimar
+export const REVIVE_RADIUS = 1.2;   // distancia horizontal máx. para contar
+export const REVIVE_HP_FRACT = 0.5; // vida con la que se levanta (50% de la máx.)
+
 // Denominaciones de moneda que sueltan los enemigos normales.
 export const COIN_DENOMS = [10, 5, 1];
 // Moneda especial (roja) que suelta el jefe. Valor fijo distinto de las normales.

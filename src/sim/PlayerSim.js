@@ -7,7 +7,9 @@
 // vista; ese es el siguiente seam (intención de disparo por red). Depende de la
 // interfaz `world` (en el cliente `Game`): walls, clampToWorld, supportHeight, audio.
 import { WEAPONS } from '../weapons.js';
-import { WEAPON_UPGRADES, PLAYER_UPGRADES } from '../systems/shared.js';
+import {
+  WEAPON_UPGRADES, PLAYER_UPGRADES, REVIVE_TIME, REVIVE_HP_FRACT,
+} from '../systems/shared.js';
 
 export const PLAYER_MAX_HP = 100;
 const BASE_SPEED = 6.5; // unidades/seg
@@ -53,7 +55,30 @@ export default class PlayerSim {
     this.y = 0;
     this.vy = 0;
     this.position = { x: 0, y: 0, z: 0 };
+
+    // Co-op: derribado (hp 0) hasta que un aliado lo reanime parándose encima
+    // REVIVE_TIME segundos. En solitario no se usa (morir = game over directo).
+    this.downed = false;
+    this.reviveProgress = 0; // segundos acumulados de reanimación
   }
+
+  /** Cae derribado (co-op): inmóvil, sin disparar, esperando reanimación. */
+  enterDowned() {
+    this.downed = true;
+    this.hp = 0;
+    this.reviveProgress = 0;
+    this.aiming = false;
+    this.reloading = false;
+  }
+
+  /** Reanimado por un aliado: se levanta con parte de la vida. */
+  revive() {
+    this.downed = false;
+    this.reviveProgress = 0;
+    this.hp = Math.max(1, Math.round(this.maxHp * REVIVE_HP_FRACT));
+  }
+
+  get reviveTime() { return REVIVE_TIME; }
 
   get speed() { return PLAYER_UPGRADES.speed.apply(BASE_SPEED, this.playerUpgrades.speed); }
 

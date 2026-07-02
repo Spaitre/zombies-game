@@ -17,6 +17,7 @@ import shopMixin from './systems/shop.js';
 import cameraMixin from './systems/camera.js';
 import platformsMixin from './systems/platforms.js';
 import bossModeMixin from './systems/bossmode.js';
+import netClientMixin from './systems/netclient.js';
 
 export default class Game {
   constructor(container) {
@@ -83,6 +84,8 @@ export default class Game {
     this._lookAheadAmt = 0;                       // look-ahead suavizado
     this.mode = 'campaign';   // 'campaign' (modo niveles) o 'boss' (modo jefe)
     this.worldSize = WORLD;   // tamaño del arena (el modo jefe lo triplica)
+    this.net = null;               // cliente de salas co-op (se crea al usarlo)
+    this.remotePlayers = new Map(); // id -> RemotePlayer (compañeros de sala)
     this.state = 'loading';
 
     window.addEventListener('resize', () => this.onResize());
@@ -279,6 +282,7 @@ export default class Game {
     this.state = 'menu';
     this.mode = 'campaign';
     this.setWorldSize(WORLD);
+    this.netCleanup(); // si venía de una sala co-op, sal de ella
     this.hud.hideBossBar();
     this.hud.hideShop();
     this.hud.hideGameOver();
@@ -295,6 +299,8 @@ export default class Game {
     this.hud.showBossMenu(
       (diff) => this.startBossMode(diff),
       () => { this.hud.hideBossMenu(); this.showMainMenu(); },
+      () => this.createRoom(),
+      (code) => this.joinRoom(code),
     );
   }
 
@@ -407,6 +413,7 @@ export default class Game {
 
     if (this.mode === 'boss') this.updateBossLevel(delta);
     else this.updateWaves(delta);
+    this.netTick(delta); // co-op: envía el estado propio (throttle interno)
     // recalcula solo si el jugador cambia de celda o de nivel (planta/loft).
     this.nav.computeFlowField(this.player.position, this.player.position.y > 1.3 ? 1 : 0);
     for (const z of this.zombies) z.update(delta, this.player, this.zombies);
@@ -429,6 +436,7 @@ export default class Game {
     }
 
     this.updateCorpses(delta); // animación de muerte + desvanecido (siempre)
+    for (const rp of this.remotePlayers.values()) rp.update(delta); // compañeros co-op
     this.updateAimUI();
     this.updateCamera(delta);
     this.renderer.render(this.scene, this.camera);
@@ -468,4 +476,5 @@ Object.assign(
   cameraMixin,
   platformsMixin,
   bossModeMixin,
+  netClientMixin,
 );

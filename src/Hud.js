@@ -90,16 +90,56 @@ export default class Hud {
   }
   hideMenu() { this.menuEl.classList.remove('show'); }
 
-  // --- Menú de dificultad del modo jefe ---
-  showBossMenu(onPick, onBack) {
+  // --- Menú de dificultad del modo jefe (+ salas co-op) ---
+  showBossMenu(onPick, onBack, onCreateRoom, onJoinRoom) {
     const el = document.getElementById('bossmenu');
     el.classList.add('show');
+    this.setRoomError('');
     for (const btn of el.querySelectorAll('.boss-diff')) {
       btn.onclick = () => { if (this.audio) this.audio.ui(); this.hideBossMenu(); onPick(btn.dataset.diff); };
     }
+    document.getElementById('room-create-btn').onclick = () => {
+      if (this.audio) this.audio.ui();
+      if (onCreateRoom) onCreateRoom();
+    };
+    const codeInput = document.getElementById('room-code');
+    document.getElementById('room-join-btn').onclick = () => {
+      if (this.audio) this.audio.ui();
+      const code = codeInput.value.toUpperCase().trim();
+      if (code.length !== 4) { this.setRoomError('El código tiene 4 letras'); return; }
+      if (onJoinRoom) onJoinRoom(code);
+    };
     document.getElementById('bossmenu-back').onclick = () => { if (this.audio) this.audio.ui(); if (onBack) onBack(); };
   }
   hideBossMenu() { const el = document.getElementById('bossmenu'); if (el) el.classList.remove('show'); }
+  setRoomError(msg) { const el = document.getElementById('room-error'); if (el) el.textContent = msg || ''; }
+
+  // --- Lobby de sala (co-op) ---
+  showLobby(room, myId, onStart, onLeave) {
+    const el = document.getElementById('lobby');
+    el.classList.add('show');
+    document.getElementById('lobby-code').textContent = room.code;
+
+    const list = document.getElementById('lobby-players');
+    list.innerHTML = '';
+    for (const p of room.players) {
+      const div = document.createElement('div');
+      div.className = `p${p.id === room.hostId ? ' host' : ''}`;
+      div.textContent = `${p.name}${p.id === room.hostId ? ' 👑' : ''}${p.id === myId ? ' (tú)' : ''}`;
+      list.appendChild(div);
+    }
+
+    const isHost = myId === room.hostId;
+    document.getElementById('lobby-host').style.display = isHost ? '' : 'none';
+    document.getElementById('lobby-wait').style.display = isHost ? 'none' : '';
+    if (isHost) {
+      for (const btn of el.querySelectorAll('.lobby-diff')) {
+        btn.onclick = () => { if (this.audio) this.audio.ui(); onStart(btn.dataset.diff); };
+      }
+    }
+    document.getElementById('lobby-leave').onclick = () => { if (this.audio) this.audio.ui(); onLeave(); };
+  }
+  hideLobby() { const el = document.getElementById('lobby'); if (el) el.classList.remove('show'); }
 
   // --- Menú de mejoras (entre niveles y desde el menú principal) ---
   showShop(data, handlers) {
