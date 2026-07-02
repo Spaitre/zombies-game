@@ -87,6 +87,8 @@ export default class Game {
     this.worldSize = WORLD;   // tamaño del arena (el modo jefe lo triplica)
     this.net = null;               // cliente de salas co-op (se crea al usarlo)
     this.remotePlayers = new Map(); // id -> RemotePlayer (compañeros de sala)
+    // Cámara en primera persona (tecla V); preferencia recordada.
+    this.firstPerson = localStorage.getItem('zombies-fpv') === '1';
     this.state = 'loading';
 
     window.addEventListener('resize', () => this.onResize());
@@ -101,6 +103,9 @@ export default class Game {
     });
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Escape' && this.state === 'playing') this.pauseGame();
+      if (e.code === 'KeyV' && (this.state === 'playing' || this.state === 'paused')) {
+        this.setFirstPerson(!this.firstPerson);
+      }
     });
 
     this.init();
@@ -231,6 +236,7 @@ export default class Game {
 
     this.player = new Player(this);
     this.applyProgress(this.player); // carga armas/mejoras guardadas (loadout de campaña)
+    this.applyCameraMode();          // 1ª/3ª persona sobre el jugador nuevo
     this.camYaw = this.player.mesh.rotation.y;
     this.snapCamera();
     this.hud.hideBossBar();
@@ -352,6 +358,32 @@ export default class Game {
     this.hud.hidePause();
     this.unlockPointer();
     this.showMainMenu();
+  }
+
+  // --- Cámara: primera ↔ tercera persona (tecla V) --------------------------
+
+  setFirstPerson(v) {
+    this.firstPerson = v;
+    try { localStorage.setItem('zombies-fpv', v ? '1' : '0'); } catch { /* sin storage */ }
+    // Al volver a 3ª persona, reencaja el pitch en su rango más corto.
+    if (!v) this.camPitch = THREE.MathUtils.clamp(this.camPitch, -0.6, 0.55);
+    this.applyCameraMode();
+    this.hud.announce(v ? 'CÁMARA: PRIMERA PERSONA' : 'CÁMARA: TERCERA PERSONA', 1100);
+  }
+
+  /** Aplica el modo de cámara al jugador actual: en 1ª persona se oculta su
+   *  modelo y el arma cuelga de la cámara como viewmodel. */
+  applyCameraMode() {
+    const p = this.player;
+    if (!p) return;
+    if (this.firstPerson) {
+      if (this.camera.parent !== this.scene) this.scene.add(this.camera); // hijos visibles
+      p.model.visible = false;
+      this.camera.add(p.gun); // reparenta (three lo quita del mesh del jugador)
+    } else {
+      p.model.visible = true;
+      p.mesh.add(p.gun); // updateGun le devuelve su transform local en el siguiente frame
+    }
   }
 
   // --- Consultas de mundo --------------------------------------------------

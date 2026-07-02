@@ -177,6 +177,17 @@ bucle, cámara, oleadas, tienda, colisiones, hitscan, etc. viven aquí).
   servible en Railway). El servidor de simulación del multijugador correría también
   en Railway como proceso Node.
 
+### Cámara en primera persona (tecla V)
+- **Toggle con V** en partida/pausa; la preferencia se recuerda (`localStorage
+  'zombies-fpv'`) y se reaplica al crear cada jugador (`Game.applyCameraMode` en
+  `prepare()`). Es 100 % cliente: cero impacto en sim/red (el disparo ya sale del
+  estado, paso 6).
+- **En FP:** cámara en los ojos (`FP_EYE 1.58`; derribado 0.6), 1:1 con el mouse
+  (sin lag/lerp), pitch ±1.25, FOV 74→58 al apuntar, retroceso y shake aplicados
+  (`camera.updateCameraFP`). El **modelo del jugador se oculta** y el **arma se
+  reparenta a la cámara** como viewmodel (transform en `Player.updateGun`, rama FP,
+  con culatazo). Retícula SIEMPRE visible en FP. Constantes en `systems/camera.js`.
+
 ### Cámara cinematográfica (Game.js)
 - Solo **delta del mouse** (pointer lock). `updateLook()` — NO usa la posición del
   cursor. `camYaw -= dX`, `camPitch -= dY` (clamp `PITCH_MIN/MAX`).

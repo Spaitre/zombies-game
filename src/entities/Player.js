@@ -211,6 +211,21 @@ export default class Player {
 
   /** El arma: relajada al explorar; elevada y alineada al impacto al apuntar. */
   updateGun(delta) {
+    // Primera persona: el arma es un viewmodel colgado de la cámara (abajo a la
+    // derecha, apuntando al frente) con culatazo hacia atrás al disparar.
+    if (this.game.firstPerson) {
+      this.gunRecoil = Math.max(0, this.gunRecoil - delta * 11);
+      const ab1 = this.sim.aimBlend;
+      const g1 = this.gun;
+      g1.position.set(
+        THREE.MathUtils.lerp(0.3, 0.16, ab1),   // apuntando: más centrada
+        THREE.MathUtils.lerp(-0.28, -0.2, ab1),
+        -0.55 + this.gunRecoil * 0.12,
+      );
+      g1.rotation.set(this.gunRecoil * 0.3, Math.PI + this.gunKickYaw * this.gunRecoil, 0);
+      return;
+    }
+
     const ab = this.sim.aimBlend;
     const lerp = THREE.MathUtils.lerp;
     const g = this.gun;
