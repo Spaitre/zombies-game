@@ -202,6 +202,7 @@ export default {
     this.state = 'over';
     this.unlockPointer();
     this.hud.hideBossBar();
+    if (this.net && this.net.inRoom) this.net.leave(); // fin de partida = fin de sala
     if (win) {
       this.hud.announce('¡NIVEL COMPLETADO!', 3500);
       this.fx.sound('waveStart');

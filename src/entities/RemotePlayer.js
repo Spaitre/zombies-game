@@ -42,6 +42,11 @@ export default class RemotePlayer {
     }
   }
 
+  /** Derribado (co-op): el modelo queda tumbado hasta que lo reanimen. */
+  setDowned(v) {
+    this.model.rotation.x = v ? -Math.PI / 2 : 0;
+  }
+
   /** Interpola suavemente hacia el último estado (suaviza el relé de red). */
   update(delta) {
     if (!this.hasState) return;

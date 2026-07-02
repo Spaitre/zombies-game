@@ -145,9 +145,30 @@ bucle, cámara, oleadas, tienda, colisiones, hitscan, etc. viven aquí).
     jugador queda DERRIBADO (tirado, sin moverse/disparar, los zombies lo ignoran);
     un aliado parado encima `REVIVE_TIME` (10 s) lo levanta con `REVIVE_HP_FRACT`
     (50 %); si todos caen → game over. Constantes en `shared.js`.
-- **Pendiente (Fase 2b/2c):** servidor corre `HeadlessWorld` por sala + protocolo
-  snapshot/eventos + zombies "títere" en el cliente + predicción local + visual de
-  derribo/reanimación en cliente. Se prueba de verdad tras desplegar en Railway.
+- **Hecho (Fase 2b, co-op autoritario):** el servidor corre un `HeadlessWorld` por
+  sala (30 Hz sim, snapshot a 15 Hz) y el cliente es una "pantalla".
+  - **Protocolo:** cliente → `input` (posición reportada client-trusted + facing +
+    aiming/fire/reload/weapon + `aimPoint`); servidor → `snap` (jugadores con
+    hp/derribo/munición, zombies, proyectiles, eventos drenados, score). El loadout
+    viaja en `create`/`join` y el servidor lo aplica (`applyLoadout`).
+  - **Cliente (`systems/netgame.js`):** `startCoopGame` (lo dispara `net.onStart`),
+    `coopStep` reemplaza a `step()` — mueve al jugador local, envía inputs ~15/s y
+    aplica snapshots: vida/munición/derribo propios autoritarios, compañeros
+    (`RemotePlayer.setDowned`), **zombies títere** (`Zombie.setNetTarget`/
+    `updatePuppet`, interpolados; muerte local al desaparecer del snap), proyectiles
+    títere y eventos → FX locales. Sin oleadas/colisiones/daño locales.
+  - **Derribo/reanimación EN RED verificados:** el servidor derriba (HUD Vida: 0,
+    modelo tumbado), "REANIMANDO… %" en pantalla, aliado encima 10 s → en pie con
+    50 %; si el aliado muere en el intento → todos caídos → GAME OVER. Verificado
+    con bots reales (médico frágil murió reanimando = game over correcto; médico
+    tanque completó la reanimación).
+  - **Gotchas arreglados:** la pausa en co-op NO congela (el servidor sigue; solo
+    libera el cursor); el lobby no se reabre por actualizaciones de sala en plena
+    partida; al terminar (victoria/derrota) el cliente sale de la sala.
+- **Pendiente (Fase 2c, pulido):** probar con latencia real tras desplegar en
+  Railway (interpolación/feel), disparo local cosmético instantáneo (hoy el
+  fogonazo/tracer llegan con el snap, ~70-140 ms), economía co-op (monedas/items
+  no existen en el servidor), y re-lobby tras partida sin recrear sala.
 - **Gotcha (patrón estado+vista):** al mover estado a la sim, **reexpón en la vista
   TODOS los campos que el resto del código lee** (getters que reenvían a `this.sim`).
   Si falta uno, se lee `undefined` → p. ej. faltó `Zombie.damage` y el jugador recibía

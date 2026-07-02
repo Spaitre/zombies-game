@@ -42,7 +42,9 @@ export default {
 
     this.net.onError = (msg) => this.hud.setRoomError(msg);
     this.net.onRoom = (room) => {
-      // Lobby (nuevo o actualizado: entradas/salidas/cambio de anfitrión).
+      // Lobby (nuevo o actualizado). NUNCA durante una partida activa: si alguien
+      // sale a mitad de juego, el server difunde 'room' y no hay que abrir el lobby.
+      if (this.coopActive || this.state === 'playing' || this.state === 'over') return;
       this.hud.hideBossMenu();
       this.hud.showLobby(room, this.net.id, (diff) => this.net.start(diff), () => this.leaveRoom());
     };
@@ -86,6 +88,7 @@ export default {
 
   /** Desconexión total al volver al menú principal. */
   netCleanup() {
+    if (this.coopActive) this.coopCleanup(); // títeres y estado del co-op
     this.clearRemotePlayers();
     this.hud.hideLobby();
     if (this.net && this.net.inRoom) this.net.leave();

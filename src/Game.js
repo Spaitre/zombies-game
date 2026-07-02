@@ -18,6 +18,7 @@ import cameraMixin from './systems/camera.js';
 import platformsMixin from './systems/platforms.js';
 import bossModeMixin from './systems/bossmode.js';
 import netClientMixin from './systems/netclient.js';
+import netGameMixin from './systems/netgame.js';
 
 export default class Game {
   constructor(container) {
@@ -396,7 +397,12 @@ export default class Game {
 
     if (this.state === 'playing') {
       this.updateLook(delta); // entrada de cámara local (delta del mouse)
-      this.step(delta, time); // simulación
+      if (this.coopActive) this.coopStep(delta); // co-op: manda el servidor
+      else this.step(delta, time);               // solo: simulación local
+    } else if (this.coopActive && this.state === 'paused') {
+      // En co-op la pausa NO congela el mundo (el servidor sigue): se sigue
+      // enviando input y aplicando snapshots; solo se libera el cursor.
+      this.coopStep(delta);
     }
     this.present(delta);      // render (cliente)
   }
@@ -477,4 +483,5 @@ Object.assign(
   platformsMixin,
   bossModeMixin,
   netClientMixin,
+  netGameMixin,
 );
