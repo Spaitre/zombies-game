@@ -19,6 +19,7 @@ import platformsMixin from './systems/platforms.js';
 import bossModeMixin from './systems/bossmode.js';
 import netClientMixin from './systems/netclient.js';
 import netGameMixin from './systems/netgame.js';
+import accountMixin from './systems/account.js';
 
 export default class Game {
   constructor(container) {
@@ -141,7 +142,7 @@ export default class Game {
     this.buildEnvironment();
     this.prepare();
     this.hud.hideLoading();
-    this.showMainMenu();
+    this.showAccountGate(); // cuenta / invitado → menú principal
     this.renderer.setAnimationLoop(() => this.frame());
   }
 
@@ -261,12 +262,19 @@ export default class Game {
     try { return JSON.parse(localStorage.getItem('zombies-progress') || 'null'); } catch { return null; }
   }
 
-  /** Guarda armas desbloqueadas + mejoras del jugador actual. */
+  /** Guarda armas desbloqueadas + mejoras + monedas. Si hay sesión iniciada,
+   *  también lo sube a la cuenta del servidor. */
   saveProgress() {
     if (!this.player) return;
     const s = this.player.sim;
-    const data = { owned: [...s.owned], weaponUpgrades: s.weaponUpgrades, playerUpgrades: s.playerUpgrades };
+    const data = {
+      owned: [...s.owned],
+      weaponUpgrades: s.weaponUpgrades,
+      playerUpgrades: s.playerUpgrades,
+      coins: this.coins,
+    };
     try { localStorage.setItem('zombies-progress', JSON.stringify(data)); } catch { /* sin storage */ }
+    this.pushProgress(data); // cuenta (no-op como invitado)
   }
 
   /** Aplica el progreso guardado a un jugador recién creado. */
@@ -279,6 +287,7 @@ export default class Game {
       for (const k in s.weaponUpgrades) if (data.weaponUpgrades[k]) Object.assign(s.weaponUpgrades[k], data.weaponUpgrades[k]);
     }
     if (data.playerUpgrades) Object.assign(s.playerUpgrades, data.playerUpgrades);
+    if (typeof data.coins === 'number') this.coins = data.coins; // monedas persistentes
     player.applyMaxHpUpgrade();
     s.hp = s.maxHp;
     for (const k in s.ammo) s.ammo[k] = player.effWeapon(k).magSize; // cargadores al tamaño mejorado
@@ -294,10 +303,13 @@ export default class Game {
     this.hud.hideShop();
     this.hud.hideGameOver();
     this.hud.hideBossMenu();
+    this.hud.hideAccount();
     this.hud.showMenu(
       () => this.startGame(),
       () => this.openUpgradeMenu(),
       () => this.openBossMenu(),
+      this.sessionUser(),
+      () => this.showAccountScreen(),
     );
   }
 
@@ -490,6 +502,7 @@ export default class Game {
     this.state = 'over';
     this.unlockPointer(); // cursor libre para el menú de game over
     this.hud.hideBossBar();
+    this.saveProgress(); // conserva monedas/mejoras al morir
     this.fx.sound('gameOver');
     // Al reintentar se vuelve al menú principal (para elegir modo).
     this.hud.showGameOver(this.score, this.wave, () => this.showMainMenu());
@@ -516,4 +529,5 @@ Object.assign(
   bossModeMixin,
   netClientMixin,
   netGameMixin,
+  accountMixin,
 );

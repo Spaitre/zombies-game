@@ -12,6 +12,7 @@ export default {
   openShop() {
     this.state = 'shop';
     this.unlockPointer(); // cursor libre para el menú
+    this.saveProgress();  // persiste las monedas recogidas en el día
     this.refreshShop('level');
   },
 
@@ -103,6 +104,7 @@ export default {
     if (this.coins < cost || this.player.hp >= this.player.maxHp) return;
     this.coins -= cost;
     this.player.heal(Infinity);
+    this.saveProgress();
     this.hud.update(this.stats());
     this.refreshShop(this._menuMode);
   },

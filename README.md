@@ -315,11 +315,44 @@ bucle, cámara, oleadas, tienda, colisiones, hitscan, etc. viven aquí).
 - En Railway: Deploy from GitHub repo; si `zombies-game` es subcarpeta, poner
   **Root Directory** = `zombies-game`. Railway corre install → build → start.
 
-### Persistencia del loadout (localStorage)
-- `Game.saveProgress/loadProgress/applyProgress` guardan **armas desbloqueadas +
-  mejoras** (`weaponUpgrades`, `playerUpgrades`) en `localStorage['zombies-progress']`.
-- Se guarda al comprar mejoras (`shop`) y al recoger un arma (`combat`); se carga en
-  `prepare()` sobre el jugador nuevo (campaña **y** modo jefe). El día NO persiste.
+### Disparo desde la cadera + precisión en red
+- **Se puede disparar SIN apuntar**: misma bala hacia la mira pero con dispersión
+  extra (`HIP_SPREAD` en `shared.js`, ~2.9°). Apuntar (RMB) sigue siendo el modo
+  preciso (zoom + solo el spread del arma). La **retícula es siempre visible** en
+  partida. Aplica en solo (`Player.tryFire`/`sim.fire(w, extra)`) y en co-op
+  (input `fire` sin requisito de `aiming`; `HeadlessWorld.tryFire`).
+- **Precisión en co-op**: el cliente apunta a títeres interpolados que van por
+  detrás del servidor → en red los zombies tienen **hitbox extra** (`NET_HIT_PAD`
+  0.3, opción `hitPad` de `HeadlessWorld`; el server la pasa). Solo afecta al
+  multijugador.
+
+### Cuentas y progreso (crear cuenta / iniciar sesión / invitado)
+- **Puerta al arrancar** (`Game.showAccountGate`): token válido → auto-login;
+  invitado recordado → menú; si no, pantalla de cuenta (overlay `#account`).
+  Botón CUENTA en el menú para entrar/salir de sesión.
+- **API en server.js**: `POST /api/register` (sube el progreso local a la cuenta
+  nueva), `POST /api/login` (el progreso de la cuenta REEMPLAZA al local),
+  `GET/PUT /api/progress` (token). Contraseñas con **scrypt+salt**; token sin
+  estado `user.hmac(user)`. Almacén en `data/users.json` (en `.gitignore`).
+  ⚠️ **Railway**: monta un Volume en `./data` o las cuentas se pierden al redeploy.
+- Cliente: mixin `systems/account.js`. ⚠️ Gotcha: en mixins con `Object.assign`
+  NO usar getters (se copia el valor congelado) — usar métodos (`sessionUser()`).
+
+### Persistencia del loadout (localStorage + cuenta)
+- `Game.saveProgress/loadProgress/applyProgress` guardan **armas + mejoras +
+  MONEDAS** en `localStorage['zombies-progress']`; con sesión iniciada, cada
+  save también se sube a la cuenta (`pushProgress`, throttled).
+- Se guarda al comprar (mejoras/curación), recoger un arma, terminar un día
+  (`openShop`), morir (`gameOver`), y en el modo jefe (victoria y fin de co-op).
+  Se carga en `prepare()` sobre el jugador nuevo. El día NO persiste.
+
+### Monedas en el modo jefe
+- **Solo**: `startBossMode` fija `coinBudget` (misma fórmula que un día de campaña
+  de ese nivel, p. ej. Fácil≈714) + `killsLeft` + `healthBudget 4`; `killZombie`
+  ya reparte. El jefe suelta la roja de 25.
+- **Co-op**: el servidor no simula monedas; cada cliente reparte su presupuesto
+  LOCAL sobre los eventos `kill` (`netgame._coopEvent`) y recoge sus monedas
+  (`_coopItems`: imán + recogida; SIN cubos de vida — la vida es del servidor).
 
 ### Animaciones
 - Jugador: mixer con `idle/holding-right`, `sprint`, `holding-right-shoot`

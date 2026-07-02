@@ -55,6 +55,10 @@
         border: 2px solid #37474f; border-radius: 8px; padding: 12px 8px; outline: none; }
       #room-code:focus { border-color: #4fc3f7; }
       .room-error { min-height: 22px; color: #ef9a9a; font-size: 15px; }
+      #acc-user, #acc-pass { pointer-events: auto; width: 260px; font: 600 18px system-ui;
+        color: #fff; background: #1e2530; border: 2px solid #37474f; border-radius: 8px;
+        padding: 12px 14px; outline: none; text-align: center; }
+      #acc-user:focus, #acc-pass:focus { border-color: #4fc3f7; }
       .lobby-players { display: flex; flex-direction: column; gap: 6px; min-width: 260px; }
       .lobby-players .p { background: #1e2530; border: 2px solid #37474f; border-radius: 8px;
         padding: 8px 14px; font: 700 17px system-ui; }
@@ -162,6 +166,24 @@
       <button id="play-btn" class="btn">JUGAR MODO NIVELES</button>
       <button id="boss-btn" class="btn red">MODO JEFE</button>
       <button id="upgrade-btn" class="btn green">MEJORAR ARMAS</button>
+      <div id="menu-session" class="sub" style="font-size:15px"></div>
+      <button id="account-btn" class="btn" style="font-size:16px;padding:8px 18px">CUENTA</button>
+    </div>
+
+    <!-- Cuenta: crear / iniciar sesión / invitado -->
+    <div id="account" class="overlay">
+      <h1 style="color:#4fc3f7">TU CUENTA</h1>
+      <div class="sub">Guarda tu progreso (armas, mejoras y monedas) en el servidor
+        para jugarlo desde cualquier navegador. O entra como invitado (solo este equipo).</div>
+      <input id="acc-user" maxlength="20" placeholder="usuario" autocomplete="username" />
+      <input id="acc-pass" type="password" maxlength="40" placeholder="contraseña" autocomplete="current-password" />
+      <div class="room-row">
+        <button id="acc-register" class="btn green">CREAR CUENTA</button>
+        <button id="acc-login" class="btn">INICIAR SESIÓN</button>
+      </div>
+      <div id="acc-error" class="room-error"></div>
+      <button id="acc-guest" class="btn">JUGAR COMO INVITADO</button>
+      <button id="acc-logout" class="btn red" style="display:none">CERRAR SESIÓN</button>
     </div>
 
     <!-- Modo jefe: selección de dificultad -->

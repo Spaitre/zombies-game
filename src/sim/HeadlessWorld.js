@@ -22,12 +22,13 @@ import {
   WORLD, VERT_HIT, rand, dist2,
   BOSS_MODES, BOSS_MODE_TOTAL, BOSS_MODE_MAX_ALIVE, BOSS_MODE_INTERVAL,
   BOSS_MODE_HP_MULT, BOSS_MODE_WORLD_MULT, BOSS_MODE_MIX,
-  REVIVE_RADIUS,
+  REVIVE_RADIUS, HIP_SPREAD,
 } from '../systems/shared.js';
 
 export default class HeadlessWorld {
-  constructor({ arenaSize = WORLD } = {}) {
+  constructor({ arenaSize = WORLD, hitPad = 0 } = {}) {
     this.worldSize = arenaSize;
+    this.hitPad = hitPad; // hitbox extra de zombies (co-op: compensa latencia)
 
     // Mundo de colisión idéntico al cliente (verificado caja a caja).
     const layout = buildLayout();
@@ -165,13 +166,13 @@ export default class HeadlessWorld {
     return tmin > 0 ? tmin : null;
   }
 
-  /** Rayo vs zombie como cilindro vertical (radio, altura del tipo). t o null. */
-  static rayZombie(o, d, z, range) {
+  /** Rayo vs zombie como cilindro vertical (radio + pad, altura del tipo). t o null. */
+  static rayZombie(o, d, z, range, pad = 0) {
     const h = ZOMBIE_TYPES[z.type].targetH;
     const ox = o.x - z.position.x;
     const oz = o.z - z.position.z;
     const a = d.x * d.x + d.z * d.z;
-    const r = z.radius;
+    const r = z.radius + pad;
     let t;
     if (a < 1e-9) { // rayo vertical: dentro del círculo o no
       if (ox * ox + oz * oz > r * r) return null;
@@ -194,7 +195,7 @@ export default class HeadlessWorld {
     const hits = []; // { t, zombie|null }
     for (const z of this.zombies) {
       if (!z.alive || z.emerging) continue;
-      const t = HeadlessWorld.rayZombie(origin, dir, z, range);
+      const t = HeadlessWorld.rayZombie(origin, dir, z, range, this.hitPad);
       if (t !== null) hits.push({ t, zombie: z });
     }
     // Pared más cercana (una basta: detiene la bala).
@@ -260,13 +261,14 @@ export default class HeadlessWorld {
     this.corpses.push(z);
   }
 
-  /** Disparo con cadencia/cargador/auto-recarga (equivalente a Player.tryFire). */
+  /** Disparo con cadencia/cargador/auto-recarga (equivalente a Player.tryFire).
+   *  Sin apuntar: dispersión extra de cadera. */
   tryFire(p, time) {
     const w = p.effWeapon(p.weapon);
     if (p.reloading || p.downed) return;
     if (time <= p.lastFired + w.fireRate) return;
     if (p.ammo[p.weapon] <= 0) { p.startReload(time); return; }
-    const origin = p.fire(w);
+    const origin = p.fire(w, p.aiming ? 0 : HIP_SPREAD);
     p.ammo[p.weapon] -= 1;
     p.lastFired = time;
     this.fx.muzzleFlash(origin);
@@ -303,7 +305,7 @@ export default class HeadlessWorld {
         p.move(delta, inp.moveDir || null, !!inp.aiming, !!inp.jump);
       }
       if (inp.reload) p.startReload(time);
-      if (inp.fire && inp.aiming) this.tryFire(p, time);
+      if (inp.fire) this.tryFire(p, time); // apuntar ya no es requisito (cadera)
     }
 
     // 2) Objetivos vivos; si no queda ninguno → game over.

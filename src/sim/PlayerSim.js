@@ -174,7 +174,7 @@ export default class PlayerSim {
    * retroceso de cámara y sube el bloom. Devuelve el origen del disparo (para el
    * fogonazo del cliente). No decrementa munición: eso lo hace el llamador.
    */
-  fire(w) {
+  fire(w, extraSpread = 0) {
     const p = this.position;
     const cf = Math.cos(this.facing);
     const sf = Math.sin(this.facing);
@@ -199,8 +199,8 @@ export default class PlayerSim {
     if (w.kind === 'grenade') {
       this.world.spawnBullet(origin, dir, w, w.damage);
     } else {
-      // Hitscan unificado: dispersión resuelta por el bloom actual.
-      const spread = w.spreadMin + (w.spreadMax - w.spreadMin) * this.bloom;
+      // Hitscan unificado: dispersión del arma (bloom) + extra de cadera si no apunta.
+      const spread = w.spreadMin + (w.spreadMax - w.spreadMin) * this.bloom + extraSpread;
       this.world.hitscanFire(origin, dir, w, 1, spread);
       this.bloom = Math.min(1, this.bloom + (w.bloomPerShot || 0));
     }

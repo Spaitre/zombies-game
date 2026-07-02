@@ -5,16 +5,116 @@
 // jugadores, el anfitrión elige dificultad y arranca; el servidor retransmite el
 // estado de cada jugador (posición/orientación) al resto de la sala.
 import http from 'node:http';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, stat, writeFile, mkdir } from 'node:fs/promises';
 import { join, extname, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { scryptSync, randomBytes, createHmac, timingSafeEqual } from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import HeadlessWorld from './src/sim/HeadlessWorld.js';
-import { WORLD, BOSS_MODE_WORLD_MULT } from './src/systems/shared.js';
+import { WORLD, BOSS_MODE_WORLD_MULT, NET_HIT_PAD } from './src/systems/shared.js';
 
-const DIST = join(fileURLToPath(new URL('.', import.meta.url)), 'dist');
+const ROOT = fileURLToPath(new URL('.', import.meta.url));
+const DIST = join(ROOT, 'dist');
 const PORT = process.env.PORT || 4173;
 const MAX_PLAYERS = 4;
+
+// --- Cuentas (progreso guardado en el servidor) -------------------------------
+// Almacén en data/users.json: { secret, users: { nombre: { salt, hash, progress } } }.
+// Contraseñas con scrypt+salt (nunca en claro); token sin estado = user.hmac(user).
+// ⚠️ En Railway el disco es efímero: monta un Volume en ./data o las cuentas se
+// pierden en cada redeploy.
+const DATA_DIR = join(ROOT, 'data');
+const USERS_FILE = join(DATA_DIR, 'users.json');
+let db = { secret: randomBytes(32).toString('hex'), users: {} };
+try {
+  db = JSON.parse(await readFile(USERS_FILE, 'utf8'));
+} catch { /* primer arranque: se crea al primer registro */ }
+
+async function saveDb() {
+  await mkdir(DATA_DIR, { recursive: true });
+  await writeFile(USERS_FILE, JSON.stringify(db));
+}
+
+const hashPass = (pass, salt) => scryptSync(String(pass), salt, 32).toString('hex');
+const signUser = (user) => createHmac('sha256', db.secret).update(user).digest('hex');
+const makeToken = (user) => `${user}.${signUser(user)}`;
+
+/** Valida "user.firma" y devuelve el usuario o null. */
+function tokenUser(token) {
+  if (typeof token !== 'string') return null;
+  const dot = token.lastIndexOf('.');
+  if (dot <= 0) return null;
+  const user = token.slice(0, dot);
+  const sig = token.slice(dot + 1);
+  if (!db.users[user]) return null;
+  const good = signUser(user);
+  if (sig.length !== good.length) return null;
+  return timingSafeEqual(Buffer.from(sig), Buffer.from(good)) ? user : null;
+}
+
+function sendJson(res, status, obj) {
+  res.writeHead(status, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Access-Control-Allow-Origin': '*', // dev: Vite en 5173 llama a 4173
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+  });
+  res.end(JSON.stringify(obj));
+}
+
+function readBody(req) {
+  return new Promise((resolve) => {
+    let raw = '';
+    req.on('data', (c) => { raw += c; if (raw.length > 64 * 1024) req.destroy(); });
+    req.on('end', () => { try { resolve(JSON.parse(raw || '{}')); } catch { resolve(null); } });
+  });
+}
+
+async function handleApi(req, res, path) {
+  if (req.method === 'OPTIONS') { sendJson(res, 204, {}); return; }
+
+  if (path === '/api/register' && req.method === 'POST') {
+    const b = await readBody(req);
+    const user = String(b?.user || '').trim();
+    const pass = String(b?.pass || '');
+    if (!/^[a-zA-Z0-9_-]{3,20}$/.test(user)) { sendJson(res, 400, { error: 'Usuario: 3-20 letras/números/_/-' }); return; }
+    if (pass.length < 4) { sendJson(res, 400, { error: 'Contraseña: mínimo 4 caracteres' }); return; }
+    if (db.users[user]) { sendJson(res, 409, { error: 'Ese usuario ya existe' }); return; }
+    const salt = randomBytes(16).toString('hex');
+    db.users[user] = { salt, hash: hashPass(pass, salt), progress: b?.progress ?? null };
+    await saveDb();
+    sendJson(res, 200, { token: makeToken(user), user, progress: db.users[user].progress });
+    return;
+  }
+
+  if (path === '/api/login' && req.method === 'POST') {
+    const b = await readBody(req);
+    const user = String(b?.user || '').trim();
+    const u = db.users[user];
+    const bad = () => sendJson(res, 401, { error: 'Usuario o contraseña incorrectos' });
+    if (!u) { bad(); return; }
+    const h = hashPass(String(b?.pass || ''), u.salt);
+    if (!timingSafeEqual(Buffer.from(h), Buffer.from(u.hash))) { bad(); return; }
+    sendJson(res, 200, { token: makeToken(user), user, progress: u.progress });
+    return;
+  }
+
+  if (path === '/api/progress') {
+    const auth = req.headers.authorization || '';
+    const user = tokenUser(auth.startsWith('Bearer ') ? auth.slice(7) : auth);
+    if (!user) { sendJson(res, 401, { error: 'Sesión inválida' }); return; }
+    if (req.method === 'GET') { sendJson(res, 200, { user, progress: db.users[user].progress }); return; }
+    if (req.method === 'PUT') {
+      const b = await readBody(req);
+      db.users[user].progress = b?.progress ?? null;
+      await saveDb();
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+  }
+
+  sendJson(res, 404, { error: 'No encontrado' });
+}
 
 // --- Servidor estático ------------------------------------------------------
 const TYPES = {
@@ -45,6 +145,7 @@ const server = http.createServer(async (req, res) => {
   try {
     // Ruta segura dentro de dist/ (evita path traversal).
     const urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
+    if (urlPath.startsWith('/api/')) { await handleApi(req, res, urlPath); return; }
     let filePath = normalize(join(DIST, urlPath));
     if (!filePath.startsWith(DIST)) { res.writeHead(403); res.end('Forbidden'); return; }
 
@@ -100,7 +201,8 @@ const r2 = (v) => Math.round(v * 100) / 100;
 const r3 = (v) => Math.round(v * 1000) / 1000;
 
 function startRoomGame(room, diff) {
-  const world = new HeadlessWorld({ arenaSize: WORLD * BOSS_MODE_WORLD_MULT });
+  // hitPad: hitbox extra en red (el cliente apunta a títeres que van con retraso).
+  const world = new HeadlessWorld({ arenaSize: WORLD * BOSS_MODE_WORLD_MULT, hitPad: NET_HIT_PAD });
   for (const [id, p] of room.players) {
     world.addPlayer(id);
     if (p.loadout) world.applyLoadout(id, p.loadout);

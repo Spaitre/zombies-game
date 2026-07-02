@@ -75,8 +75,30 @@ export default class Hud {
   showLoading() { document.getElementById('loading').classList.add('show'); }
   hideLoading() { document.getElementById('loading').classList.remove('show'); }
 
+  // --- Cuenta (crear / iniciar sesión / invitado) ---
+  showAccount({ user, onRegister, onLogin, onGuest, onLogout }) {
+    const el = document.getElementById('account');
+    el.classList.add('show');
+    this.setAccountError('');
+    const userIn = document.getElementById('acc-user');
+    const passIn = document.getElementById('acc-pass');
+    const ui = () => { if (this.audio) this.audio.ui(); };
+    document.getElementById('acc-register').onclick = () => { ui(); onRegister(userIn.value.trim(), passIn.value); };
+    document.getElementById('acc-login').onclick = () => { ui(); onLogin(userIn.value.trim(), passIn.value); };
+    document.getElementById('acc-guest').onclick = () => { ui(); onGuest(); };
+    const logout = document.getElementById('acc-logout');
+    logout.style.display = user ? '' : 'none';
+    logout.onclick = () => { ui(); onLogout(); };
+  }
+  hideAccount() { const el = document.getElementById('account'); if (el) el.classList.remove('show'); }
+  setAccountError(msg) { const el = document.getElementById('acc-error'); if (el) el.textContent = msg || ''; }
+
   // --- Menú de inicio ---
-  showMenu(onPlay, onUpgrade, onBoss) {
+  showMenu(onPlay, onUpgrade, onBoss, sessionUser = null, onAccount = null) {
+    const sess = document.getElementById('menu-session');
+    if (sess) sess.textContent = sessionUser ? `Sesión: ${sessionUser} (progreso en la nube)` : 'Invitado (progreso solo en este equipo)';
+    const accBtn = document.getElementById('account-btn');
+    if (accBtn) accBtn.onclick = () => { if (this.audio) this.audio.ui(); if (onAccount) onAccount(); };
     this.menuEl.classList.add('show');
     document.getElementById('play-btn').onclick = () => {
       if (this.audio) this.audio.ui();

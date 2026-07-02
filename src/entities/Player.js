@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import PlayerSim, { PLAYER_MAX_HP } from '../sim/PlayerSim.js';
+import { HIP_SPREAD } from '../systems/shared.js';
 import { MODEL_FACE_OFFSET } from '../Models.js';
 
 export { PLAYER_MAX_HP };
@@ -279,8 +280,9 @@ export default class Player {
 
   tryFire(time) {
     const w = this.sim.effWeapon(this.sim.weapon);
-    if (this.sim.reloading) return;
-    if (!this.sim.aiming) return; // estilo RE2: solo se dispara apuntando (botón derecho)
+    if (this.sim.reloading || this.sim.downed) return;
+    // Se puede disparar SIN apuntar (desde la cadera): misma bala hacia la mira,
+    // pero con dispersión extra. Apuntar (RMB) sigue siendo el modo preciso.
     if (this.game.input.firing && time > this.sim.lastFired + w.fireRate) {
       if (this.sim.ammo[this.sim.weapon] <= 0) {
         this.sim.startReload(time); // cargador vacío → recarga automática
@@ -295,7 +297,7 @@ export default class Player {
   fire(w) {
     // La lógica del disparo (cañón, dirección, spawn, retroceso de cámara, bloom)
     // vive en la sim; devuelve el origen para el fogonazo.
-    const origin = this.sim.fire(w);
+    const origin = this.sim.fire(w, this.sim.aiming ? 0 : HIP_SPREAD);
 
     // Efectos de cliente: retroceso visual del arma, fogonazo, audio, animación.
     this.gunRecoil = 1;

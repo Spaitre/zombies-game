@@ -72,6 +72,14 @@ export const BOSS_MODE_WORLD_MULT = 3;   // el mapa es el triple de grande
 // Mezcla de enemigos normales (acumulativa): zombie 55%, esqueleto 30%, fantasma 15%.
 export const BOSS_MODE_MIX = [['walker', 0.55], ['runner', 0.85], ['tank', 1.0]];
 
+// Disparo desde la cadera (sin apuntar): dispersión EXTRA sobre la del arma.
+// Apuntar (RMB) sigue siendo el modo preciso (zoom + spread del arma).
+export const HIP_SPREAD = 0.05; // ~2.9° adicionales
+
+// Hitbox extra de los zombies en el SERVIDOR co-op (compensa la latencia: el
+// cliente apunta a títeres interpolados que van por detrás de la verdad).
+export const NET_HIT_PAD = 0.3;
+
 // --- Co-op: derribo y reanimación -----------------------------------------
 // Al llegar a 0 de vida en co-op el jugador queda DERRIBADO (no muerto): un
 // aliado debe pararse encima de él REVIVE_TIME segundos para reanimarlo. Si

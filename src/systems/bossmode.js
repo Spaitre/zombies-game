@@ -25,6 +25,12 @@ export default {
 
     this.bossCfg = cfg;
     this.wave = cfg.level;              // nivel en el que se basan los enemigos
+    // Economía: mismo presupuesto de monedas que un día de campaña de ese nivel,
+    // repartido entre los 50 enemigos (killZombie → dropCoins ya lo usa).
+    this.coinBudget = Math.round(25 * (1 + (cfg.level - 1) * 0.6) * rand(0.85, 1.15));
+    this.killsLeft = BOSS_MODE_TOTAL;
+    this.healthBudget = 4;              // algunos cubos de vida en el nivel largo
+    this.healthDropped = 0;
     this.bossToSpawn = BOSS_MODE_TOTAL; // enemigos normales que faltan por aparecer
     this.bossSpawnTimer = BOSS_MODE_INTERVAL; // primer enemigo a los 2 s
     this.bossElapsed = 0;
@@ -116,6 +122,7 @@ export default {
     this.state = 'over'; // detiene la simulación; el render sigue
     this.unlockPointer();
     this.hud.hideBossBar();
+    this.saveProgress(); // persiste las monedas ganadas en el nivel
     this.hud.announce('¡NIVEL COMPLETADO!', 3500);
     this.fx.sound('waveStart');
     setTimeout(() => this.showMainMenu(), 3200);

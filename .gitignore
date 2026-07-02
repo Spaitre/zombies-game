@@ -1,6 +1,9 @@
 # Dependencias (se reinstalan con `npm install`)
 node_modules/
 
+# Cuentas de jugadores (datos locales del servidor)
+data/
+
 # Build de Vite
 dist/
 

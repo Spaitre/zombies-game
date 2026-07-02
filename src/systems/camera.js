@@ -39,9 +39,9 @@ export default {
   updateAimUI() {
     const ch = this._crosshairEl || (this._crosshairEl = document.getElementById('crosshair'));
     const lh = this._lockHintEl || (this._lockHintEl = document.getElementById('lockhint'));
+    // Retícula siempre visible en partida (se puede disparar desde la cadera).
     const playing = this.state === 'playing';
-    const aiming = playing && this.player && (this.player.aimBlend > 0.35 || this.firstPerson);
-    if (ch) ch.style.display = aiming ? 'block' : 'none';
+    if (ch) ch.style.display = playing && this.player ? 'block' : 'none';
     const needLock = playing && !this.input.pointerLocked && !(this.touch && this.touch.enabled);
     if (lh) lh.style.display = needLock ? 'block' : 'none';
   },

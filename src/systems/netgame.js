@@ -5,7 +5,9 @@
 // simulan oleadas/colisiones/daño: manda el servidor.
 import * as THREE from 'three';
 import Zombie from '../entities/Zombie.js';
-import { BOSS_MODES, WORLD, BOSS_MODE_WORLD_MULT } from './shared.js';
+import {
+  BOSS_MODES, WORLD, BOSS_MODE_WORLD_MULT, BOSS_MODE_TOTAL, rand, dist2,
+} from './shared.js';
 
 const INPUT_INTERVAL = 1 / 15;
 
@@ -38,6 +40,12 @@ export default {
     this._inputTimer = 0;
     this._coopOver = false;
 
+    // Monedas en co-op: cada cliente reparte su propio presupuesto local sobre
+    // los eventos 'kill' del servidor y recoge sus monedas (sin cubos de vida:
+    // la vida es autoritaria del servidor).
+    this.coinBudget = Math.round(25 * (1 + (cfg.level - 1) * 0.6) * rand(0.85, 1.15));
+    this.killsLeft = BOSS_MODE_TOTAL;
+
     this.state = 'playing';
     this.lockPointer();
     this.hud.update(this.stats());
@@ -54,6 +62,24 @@ export default {
 
     this._coopSendInput(delta);
     this._coopApplySnap(delta);
+    this._coopItems(delta);
+  },
+
+  /** Monedas locales: imán + recogida (solo monedas; la vida es del servidor). */
+  _coopItems(delta) {
+    const p = this.player;
+    for (const it of this.items) it.update(delta);
+    for (const it of this.items) {
+      if (!it.alive || it.type !== 'coin') continue;
+      if (Math.abs(it.position.y - p.position.y) > 1.8) continue;
+      if (dist2(it.position.x, it.position.z, p.position.x, p.position.z) <= it.radius * it.radius) {
+        it.apply(p); // suma monedas
+        this.fx.sound('pickup');
+        it.destroy();
+        this.hud.update(this.stats());
+      }
+    }
+    this.items = this.items.filter((it) => it.alive);
   },
 
   _coopSendInput(delta) {
@@ -66,7 +92,7 @@ export default {
       px: +p.position.x.toFixed(2), py: +p.position.y.toFixed(2), pz: +p.position.z.toFixed(2),
       f: +p.sim.facing.toFixed(3),
       aiming: p.sim.aiming ? 1 : 0,
-      fire: (this.input.firing && p.sim.aiming) ? 1 : 0,
+      fire: this.input.firing ? 1 : 0, // también desde la cadera
       reload: this.input.keys.has('KeyR') ? 1 : 0,
       weapon: p.weapon,
       ax: +p.aimPoint.x.toFixed(2), ay: +p.aimPoint.y.toFixed(2), az: +p.aimPoint.z.toFixed(2),
@@ -182,7 +208,11 @@ export default {
       case 'explosion': this.fx.explosion(e, e.radius); break;
       case 'muzzle': this.fx.muzzleFlash(e); break;
       case 'sound': this.fx.sound(e.name); break;
-      case 'kill': this.fx.sound('zombieDeath'); break;
+      case 'kill':
+        this.fx.sound('zombieDeath');
+        // Monedas locales sobre el kill compartido (cada cliente sus drops).
+        this.dropCoins({ position: { x: e.x, y: e.y, z: e.z }, isBoss: e.type === 'boss' });
+        break;
       case 'boss': this.hud.announce('¡JEFE!', 2000); this.fx.sound('bossSpawn'); break;
       case 'downed':
         if (e.id !== this.net.id) this.hud.announce('¡Un compañero ha caído! Párate encima para reanimarlo', 3500);
@@ -202,6 +232,7 @@ export default {
     this.state = 'over';
     this.unlockPointer();
     this.hud.hideBossBar();
+    this.saveProgress(); // persiste las monedas recogidas en el co-op
     if (this.net && this.net.inRoom) this.net.leave(); // fin de partida = fin de sala
     if (win) {
       this.hud.announce('¡NIVEL COMPLETADO!', 3500);
